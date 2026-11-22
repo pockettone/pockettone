@@ -6,10 +6,16 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <WebView
-        android:id="@+id/recaptcha_webview"
+    <org.thoughtcrime.securesms.flip.KeypadCursorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="16dp">
+
+        <WebView
+            android:id="@+id/recaptcha_webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </org.thoughtcrime.securesms.flip.KeypadCursorLayout>
 
 </ScrollView>

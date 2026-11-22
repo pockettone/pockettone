@@ -29,6 +29,10 @@ abstract class CaptchaFragment : LoggingFragment(R.layout.fragment_registration_
     SystemWindowInsetsSetter.attach(view, viewLifecycleOwner)
     binding.registrationCaptchaWebView.settings.javaScriptEnabled = true
     binding.registrationCaptchaWebView.clearCache(true)
+    // Lets the keypad pointer zoom with 1 and 3; no on-screen zoom buttons.
+    binding.registrationCaptchaWebView.settings.setSupportZoom(true)
+    binding.registrationCaptchaWebView.settings.builtInZoomControls = true
+    binding.registrationCaptchaWebView.settings.displayZoomControls = false
 
     binding.registrationCaptchaWebView.webViewClient = object : WebViewClient() {
       @Deprecated("Deprecated in Java")

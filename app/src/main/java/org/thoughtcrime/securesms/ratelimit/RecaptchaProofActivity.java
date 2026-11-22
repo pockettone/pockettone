@@ -67,6 +67,10 @@ public class RecaptchaProofActivity extends PassphraseRequiredActivity {
     WebView webView = findViewById(R.id.recaptcha_webview);
     webView.getSettings().setJavaScriptEnabled(true);
     webView.clearCache(true);
+    // Lets the keypad pointer zoom with 1 and 3; no on-screen zoom buttons.
+    webView.getSettings().setSupportZoom(true);
+    webView.getSettings().setBuiltInZoomControls(true);
+    webView.getSettings().setDisplayZoomControls(false);
     webView.setBackgroundColor(Color.TRANSPARENT);
     webView.setWebViewClient(new WebViewClient() {
       @Override

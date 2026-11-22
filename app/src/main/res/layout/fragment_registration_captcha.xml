@@ -27,8 +27,8 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <WebView
-            android:id="@+id/registration_captcha_web_view"
+        <org.thoughtcrime.securesms.flip.KeypadCursorLayout
+            android:id="@+id/registration_captcha_cursor"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_marginStart="16dp"
@@ -38,7 +38,14 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/registration_captcha_title" />
+            app:layout_constraintTop_toBottomOf="@+id/registration_captcha_title">
+
+            <WebView
+                android:id="@+id/registration_captcha_web_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </org.thoughtcrime.securesms.flip.KeypadCursorLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
