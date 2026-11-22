@@ -96,6 +96,7 @@ public class InputPanel extends ConstraintLayout
   private EmojiToggle           mediaKeyboard;
   private ComposeText           composeText;
   private ImageButton           quickCameraToggle;
+  private boolean               showChatExtras = true;
   private ImageButton           quickAudioToggle;
   private AnimatingToggle       buttonToggle;
   private SendButton            sendButton;
@@ -184,8 +185,12 @@ public class InputPanel extends ConstraintLayout
 
     this.recordLockCancel.setOnClickListener(v -> microphoneRecorderView.cancelAction(true));
 
-    mediaKeyboard.setVisibility(View.VISIBLE);
-    emojiVisible = true;
+    // PocketTone: emoji, quick camera and voice note are off unless turned
+    // on in PocketTone settings.
+    showChatExtras = org.thoughtcrime.securesms.flip.PocketToneUi.getShowChatExtras();
+    mediaKeyboard.setVisibility(showChatExtras ? View.VISIBLE : View.GONE);
+    emojiVisible = showChatExtras;
+    if (!showChatExtras) microphoneRecorderView.setVisibility(View.GONE);
 
     stickerSuggestionAdapter = new ConversationStickerSuggestionAdapter(Glide.with(this), this);
 
@@ -240,7 +245,7 @@ public class InputPanel extends ConstraintLayout
 
     mediaKeyboard.setOnClickListener(v -> listener.onEmojiToggle());
 
-    if (getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+    if (showChatExtras && getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
       quickCameraToggle.setOnClickListener(v -> listener.onQuickCameraToggleClicked());
       quickCameraToggle.setVisibility(View.VISIBLE);
     } else {
@@ -444,8 +449,8 @@ public class InputPanel extends ConstraintLayout
   }
 
   public void showMediaKeyboardToggle(boolean show) {
-    emojiVisible = show;
-    mediaKeyboard.setVisibility(show ? View.VISIBLE : GONE);
+    emojiVisible = show && showChatExtras;
+    mediaKeyboard.setVisibility(emojiVisible ? View.VISIBLE : GONE);
   }
 
   public void setMediaKeyboardToggleMode(@NonNull MediaKeyboardTab tab) {
@@ -916,6 +921,7 @@ public class InputPanel extends ConstraintLayout
   }
 
   private void fadeIn(@NonNull View v) {
+    if (!showChatExtras && (v == quickCameraToggle || v == quickAudioToggle)) return;
     v.animate()
      .setListener(new AnimationStartListener() {
        @Override

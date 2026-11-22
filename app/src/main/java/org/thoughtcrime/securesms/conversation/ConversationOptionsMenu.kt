@@ -39,6 +39,17 @@ internal object ConversationOptionsMenu {
     private var createdPreRenderMenu = false
 
     override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+      buildMenu(menu, menuInflater)
+      // PocketTone: unless turned on in PocketTone settings, the call
+      // buttons leave the top bar and are listed under Options instead.
+      if (!org.thoughtcrime.securesms.flip.PocketToneUi.showCallButtons) {
+        for (id in intArrayOf(R.id.menu_video_secure, R.id.menu_call_secure)) {
+          menu.findItem(id)?.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        }
+      }
+    }
+
+    private fun buildMenu(menu: Menu, menuInflater: MenuInflater) {
       if (createdPreRenderMenu && !afterFirstRenderMode) {
         return
       }

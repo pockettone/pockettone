@@ -830,6 +830,12 @@
             android:theme="@style/Theme.Signal.DayNight.NoActionBar" />
 
         <activity
+            android:name=".flip.PocketToneSettingsActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenSize"
+            android:exported="false"
+            android:theme="@style/Theme.Signal.DayNight.NoActionBar" />
+
+        <activity
             android:name=".MainActivity"
             android:configChanges="touchscreen|keyboard|keyboardHidden"
             android:enableOnBackInvokedCallback="true"

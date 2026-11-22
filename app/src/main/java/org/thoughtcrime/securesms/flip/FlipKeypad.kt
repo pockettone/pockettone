@@ -3,14 +3,15 @@ package org.thoughtcrime.securesms.flip
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Application
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.style.BackgroundColorSpan
-import android.text.style.ForegroundColorSpan
-import android.text.style.StyleSpan
+import android.text.style.ReplacementSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -21,6 +22,7 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.appcompat.widget.Toolbar
@@ -40,8 +42,20 @@ import java.util.WeakHashMap
  *  - Soft keys: left = T9/abc/123 menu in a text field, otherwise Back;
  *    right = the screen's options menu. Call = send. Clear = backspace,
  *    or Back once the field is empty.
+ *  - [FocusHighlight] boxes whatever has D-pad focus.
  */
 object FlipKeypad {
+
+  /** An activity can take over the soft keys when no text field is
+   *  selected (e.g. the chat list: left = New, right = its own menu). */
+  interface SoftKeyHost {
+    /** Label for the left soft key, or null for the default "Back". */
+    fun leftSoftKeyLabel(): String?
+    /** True if handled; false falls back to Back. */
+    fun onLeftSoftKey(): Boolean
+    /** True if handled; false opens the screen's options menu. */
+    fun onRightSoftKey(): Boolean
+  }
 
   private val TAG = Log.tag(FlipKeypad::class.java)
 
@@ -55,7 +69,10 @@ object FlipKeypad {
 
     app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
       override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = attach(activity)
-      override fun onActivityStarted(activity: Activity) = Unit
+      override fun onActivityStarted(activity: Activity) {
+        activity.window?.let { runCatching { FocusHighlight.attach(it) } }
+        controllers[activity]?.let { runCatching { it.showSoftKeys() } }
+      }
       override fun onActivityResumed(activity: Activity) = Unit
       override fun onActivityPaused(activity: Activity) {
         controllers[activity]?.endSession()
@@ -77,6 +94,7 @@ object FlipKeypad {
     controllers[activity] = controller
     val base = window.callback
     window.callback = KeyInterceptingCallback(base, controller)
+    runCatching { FocusHighlight.watchDialogs(activity) }
   }
 
   private class KeyInterceptingCallback(
@@ -114,10 +132,11 @@ object FlipKeypad {
           }
           if (used) {
             consumed.add(code)
+            refreshSoftKeys()
             return true
           }
           consumed.remove(code)
-          return superDispatch(event)
+          return superDispatch(event).also { refreshSoftKeys() }
         }
         KeyEvent.ACTION_UP -> {
           if (consumed.remove(code)) {
@@ -137,14 +156,14 @@ object FlipKeypad {
       when (code) {
         KeyEvent.KEYCODE_SOFT_LEFT -> {
           if (event.repeatCount == 0) {
-            if (s != null) showModeMenu(s) else goBack()
+            if (s != null) showModeMenu(s) else if ((activity as? SoftKeyHost)?.onLeftSoftKey() != true) goBack()
           }
           return true
         }
         KeyEvent.KEYCODE_SOFT_RIGHT, KeyEvent.KEYCODE_MENU -> {
           if (event.repeatCount == 0) {
             s?.confirmPending()
-            openOptionsMenu()
+            if ((activity as? SoftKeyHost)?.onRightSoftKey() != true) openOptionsMenu()
           }
           return true
         }
@@ -222,6 +241,7 @@ object FlipKeypad {
       sessionView = null
       consumed.clear()
       hideBar()
+      refreshSoftKeys()
     }
 
     // --- soft keys ---------------------------------------------------------
@@ -267,32 +287,96 @@ object FlipKeypad {
       return null
     }
 
+    // --- soft-key bar (TurboText style) -------------------------------------
+
+    private var softBar: LinearLayout? = null
+    private var softLeft: TextView? = null
+    private var softRight: TextView? = null
+
+    /** A #222222 strip along the bottom naming what the two soft keys do,
+     *  like TurboText's. The screen's content is padded up so nothing hides
+     *  behind it. Added once the activity has its content view. */
+    fun showSoftKeys() {
+      if (softBar != null) return
+      val decor = activity.window.decorView as? ViewGroup ?: return
+      val content = decor.findViewById<ViewGroup>(android.R.id.content) ?: return
+      val density = activity.resources.displayMetrics.density
+      val pad = (6 * density).toInt()
+
+      fun label(gravity: Int) = TextView(activity).apply {
+        setTextColor(FocusHighlight.ACCENT)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        typeface = Typeface.DEFAULT_BOLD
+        maxLines = 1
+        this.gravity = gravity
+        isFocusable = false
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+      }
+      val left = label(Gravity.START)
+      val right = label(Gravity.END)
+      val bar = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setBackgroundColor(FocusHighlight.SURFACE)
+        setPadding(pad * 4 / 3, pad, pad * 4 / 3, pad)
+        isFocusable = false
+        descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        elevation = 16 * density
+        addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(right, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+      }
+      decor.addView(bar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
+      bar.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+        val h = bottom - top
+        if (content.paddingBottom != h) content.setPadding(content.paddingLeft, content.paddingTop, content.paddingRight, h)
+      }
+      softBar = bar
+      softLeft = left
+      softRight = right
+
+      // Start typing support as soon as a text field is selected, so the
+      // left soft key shows the input mode before the first keypress.
+      decor.viewTreeObserver.addOnGlobalFocusChangeListener { _, _ ->
+        decor.post {
+          runCatching { currentSession() }
+          refreshSoftKeys()
+        }
+      }
+      refreshSoftKeys()
+    }
+
+    private fun refreshSoftKeys() {
+      val left = softLeft ?: return
+      val s = session
+      val leftText = s?.modeLabel() ?: (activity as? SoftKeyHost)?.leftSoftKeyLabel() ?: "Back"
+      if (left.text != leftText) left.text = leftText
+      softRight?.let { if (it.text != "Options") it.text = "Options" }
+    }
+
     // --- suggestion bar ----------------------------------------------------
 
     override fun onStateChanged(session: T9Session) {
       if (session !== this.session && this.session != null) return
+      refreshSoftKeys()
       val (candidates, index) = session.suggestions()
-      val text = SpannableStringBuilder()
-      val label = " ${session.modeLabel()} "
-      text.append(label)
-      text.setSpan(StyleSpan(Typeface.BOLD), 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-      text.setSpan(ForegroundColorSpan(Color.rgb(0x9C, 0xC3, 0xFF)), 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-      if (candidates.isNotEmpty() && index >= 0) {
-        val row = T9Session.CANDIDATE_ROW
-        val start = (index / row) * row
-        val end = minOf(candidates.size, start + row)
-        if (start > 0) text.append(" ‹")
-        for (i in start until end) {
-          text.append("  ")
-          val s = text.length
-          text.append(candidates[i])
-          if (i == index) {
-            text.setSpan(BackgroundColorSpan(Color.rgb(0x2C, 0x6B, 0xED)), s, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            text.setSpan(StyleSpan(Typeface.BOLD), s, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-          }
-        }
-        if (end < candidates.size) text.append("  ›")
+      // TurboText style: plain light-blue words, the current one on a
+      // rounded light-blue pill. The mode label lives on the left soft key.
+      if (candidates.isEmpty() || index < 0) {
+        hideBar()
+        return
       }
+      val text = SpannableStringBuilder()
+      val row = T9Session.CANDIDATE_ROW
+      val start = (index / row) * row
+      val end = minOf(candidates.size, start + row)
+      if (start > 0) text.append("‹ ")
+      for (i in start until end) {
+        if (i > start) text.append("   ")
+        val s = text.length
+        text.append(candidates[i])
+        if (i == index) text.setSpan(PillSpan(SUGGESTION, Color.BLACK, activity.resources.displayMetrics.density), s, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+      }
+      if (end < candidates.size) text.append(" ›")
       bar.text = text
       bar.visibility = View.VISIBLE
       positionBar()
@@ -300,12 +384,12 @@ object FlipKeypad {
 
     private fun createBar(): TextView {
       val tv = TextView(activity)
-      tv.setBackgroundColor(Color.argb(0xEE, 0x1B, 0x1B, 0x1D))
-      tv.setTextColor(Color.WHITE)
-      tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+      tv.setBackgroundColor(Color.BLACK)
+      tv.setTextColor(SUGGESTION)
+      tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
       tv.maxLines = 2
       val pad = (4 * activity.resources.displayMetrics.density).toInt()
-      tv.setPadding(pad, pad, pad, pad)
+      tv.setPadding(pad * 3, pad, pad * 3, pad)
       tv.elevation = 24 * activity.resources.displayMetrics.density
       tv.isFocusable = false
       tv.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -330,6 +414,29 @@ object FlipKeypad {
 
     private fun hideBar() {
       barView?.let { if (it.visibility != View.GONE) it.visibility = View.GONE }
+    }
+  }
+
+  /** TurboText's suggestion colour (#80D8FF). */
+  private val SUGGESTION = 0xFF80D8FF.toInt()
+
+  /** Draws a word on a rounded background without changing its width, so
+   *  moving the highlight never re-wraps the bar. */
+  private class PillSpan(private val bg: Int, private val fg: Int, density: Float) : ReplacementSpan() {
+    private val bleed = 4 * density
+    private val radius = 8 * density
+
+    override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int =
+      kotlin.math.ceil(paint.measureText(text, start, end)).toInt()
+
+    override fun draw(canvas: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) {
+      val width = paint.measureText(text, start, end)
+      val old = paint.color
+      paint.color = bg
+      canvas.drawRoundRect(RectF(x - bleed, top.toFloat(), x + width + bleed, bottom.toFloat()), radius, radius, paint)
+      paint.color = fg
+      canvas.drawText(text, start, end, x, y.toFloat(), paint)
+      paint.color = old
     }
   }
 }

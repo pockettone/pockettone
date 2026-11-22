@@ -22,7 +22,6 @@ import org.signal.storage.keyvalue.stringValue
 import org.signal.storage.protos.SignalStoreList
 import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.preferences.widgets.NotificationPrivacyPreference
-import org.thoughtcrime.securesms.util.DynamicTheme
 import org.thoughtcrime.securesms.util.Environment
 import org.thoughtcrime.securesms.util.SingleLiveEvent
 import java.util.Arrays
@@ -239,13 +238,13 @@ class SettingsValues internal constructor(store: KeyValueStore, private val cont
     }
 
   var theme: Theme
-    get() = Theme.deserialize(getNonNullString(THEME, if (DynamicTheme.systemThemeAvailable()) "system" else "light"))
+    get() = Theme.deserialize(getNonNullString(THEME, "dark"))
     set(value) {
       putString(THEME, value.serialize())
       configurationSettingChanged.postValue(THEME)
     }
 
-  var messageFontSize: Int by integerValue(MESSAGE_FONT_SIZE, 16)
+  var messageFontSize: Int by integerValue(MESSAGE_FONT_SIZE, 18)
 
   fun getMessageQuoteFontSize(context: Context): Int {
     val currentMessageSize = messageFontSize
@@ -576,10 +575,10 @@ class SettingsValues internal constructor(store: KeyValueStore, private val cont
     val writer = store.beginWrite()
 
     if (!store.containsKey(THEME)) {
-      writer.putString(THEME, LegacySharedPrefs.getString(context, "pref_theme", if (DynamicTheme.systemThemeAvailable()) "system" else "light"))
+      writer.putString(THEME, LegacySharedPrefs.getString(context, "pref_theme", "dark"))
     }
     if (!store.containsKey(MESSAGE_FONT_SIZE)) {
-      writer.putInteger(MESSAGE_FONT_SIZE, LegacySharedPrefs.getIntegerFromString(context, "pref_message_body_text_size", 16))
+      writer.putInteger(MESSAGE_FONT_SIZE, LegacySharedPrefs.getIntegerFromString(context, "pref_message_body_text_size", 18))
     }
     if (!store.containsKey(PREFER_SYSTEM_EMOJI)) {
       writer.putBoolean(PREFER_SYSTEM_EMOJI, LegacySharedPrefs.getBoolean(context, "pref_system_emoji", false))

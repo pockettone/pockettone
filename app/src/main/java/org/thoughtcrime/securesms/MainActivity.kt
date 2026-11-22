@@ -7,6 +7,7 @@ package org.thoughtcrime.securesms
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -51,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,6 +106,9 @@ import org.signal.core.util.concurrent.LifecycleDisposable
 import org.signal.core.util.getSerializableCompat
 import org.signal.core.util.logging.Log
 import org.signal.donations.StripeApi
+import org.thoughtcrime.securesms.flip.FlipKeypad
+import org.thoughtcrime.securesms.flip.PocketToneSettingsActivity
+import org.thoughtcrime.securesms.flip.PocketToneUi
 import org.thoughtcrime.securesms.backup.v2.ArchiveRestoreProgress
 import org.thoughtcrime.securesms.backup.v2.ArchiveRestoreProgressState
 import org.thoughtcrime.securesms.backup.v2.ui.CouldNotCompleteBackupRestoreSheet
@@ -200,7 +205,8 @@ class MainActivity :
   MainNavigationEventSink,
   CallLogFragment.Callback,
   ConversationFragment.MediaEditorHandoffListener,
-  GooglePayComponent {
+  GooglePayComponent,
+  FlipKeypad.SoftKeyHost {
 
   companion object {
     private val TAG = Log.tag(MainActivity::class)
@@ -258,6 +264,10 @@ class MainActivity :
   private val toolbarViewModel: MainToolbarViewModel by viewModels()
   private val toolbarCallback = ToolbarCallback()
 
+  // PocketTone: which optional parts of the chat list are shown.
+  private val showTabs = mutableStateOf(PocketToneUi.showTabs)
+  private val showTips = mutableStateOf(PocketToneUi.showTips)
+
   private val motionEventRelay: MotionEventRelay by viewModels()
 
   private var onFirstRender = false
@@ -295,6 +305,7 @@ class MainActivity :
 
     super.onCreate(savedInstanceState, ready)
     navigator = MainNavigator(this, mainNavigationViewModel)
+    PocketToneUi.applyFirstRunDefaults()
 
     AppForegroundObserver.addListener(object : AppForegroundObserver.Listener {
       override fun onForeground() {
@@ -629,11 +640,13 @@ class MainActivity :
             state = bottomChromeState,
             callback = mainBottomChromeCallback,
             megaphoneActionController = megaphoneActionController,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
+            showFloatingButtons = showTabs.value,
+            showMegaphones = showTips.value
           )
         }
 
-        if (navigationType == NavigationType.BAR && mainToolbarState.mode == MainToolbarMode.FULL) {
+        if (navigationType == NavigationType.BAR && mainToolbarState.mode == MainToolbarMode.FULL && showTabs.value) {
           Column(
             modifier = Modifier
               .clip(contentLayoutData.navigationBarShape)
@@ -718,6 +731,44 @@ class MainActivity :
     }
   }
 
+  // --- PocketTone soft keys (TurboText style) ---------------------------
+
+  private fun onChatList(): Boolean {
+    val state = toolbarViewModel.state.value
+    return state.mode == MainToolbarMode.FULL && state.destination == MainListRoute.Chats
+  }
+
+  override fun leftSoftKeyLabel(): String? = if (onChatList()) "New" else null
+
+  override fun onLeftSoftKey(): Boolean {
+    if (!onChatList()) return false
+    mainBottomChromeCallback.onNewChatClick()
+    return true
+  }
+
+  override fun onRightSoftKey(): Boolean {
+    if (toolbarViewModel.state.value.mode == MainToolbarMode.ACTION_MODE) return false
+    val items = mutableListOf<Pair<String, () -> Unit>>(
+      "New chat" to { mainBottomChromeCallback.onNewChatClick() },
+      "New group" to { toolbarCallback.onNewGroupClick() },
+      "Search" to { toolbarCallback.onSearchClick() },
+      "Mark all read" to { toolbarCallback.onMarkReadClick() },
+      "Archived chats" to { toolbarCallback.onOpenArchiveClick() }
+    )
+    if (!showTabs.value) {
+      items += "Calls" to { mainNavigationViewModel.onEvent(MainNavigationEvents.GoToTab(MainListRoute.Calls)) }
+    }
+    items += "Settings" to { toolbarCallback.onSettingsClick() }
+    items += "PocketTone settings" to { startActivity(PocketToneSettingsActivity.createIntent(this)) }
+    AlertDialog.Builder(this)
+      .setItems(items.map { it.first }.toTypedArray()) { dialog, which ->
+        dialog.dismiss()
+        items[which].second()
+      }
+      .show()
+    return true
+  }
+
   override fun onPreCreate() {
     super.onPreCreate()
     dynamicTheme.onCreate(this)
@@ -730,6 +781,15 @@ class MainActivity :
     }
     hasBeenOffScreen = false
     dynamicTheme.onResume(this)
+
+    showTabs.value = PocketToneUi.showTabs
+    showTips.value = PocketToneUi.showTips
+    if (!showTabs.value) {
+      val tab = toolbarViewModel.state.value.destination
+      if (tab == MainListRoute.Calls || tab == MainListRoute.Stories) {
+        mainNavigationViewModel.onEvent(MainNavigationEvents.GoToTab(MainListRoute.Chats))
+      }
+    }
 
     toolbarViewModel.refresh()
 

@@ -63,7 +63,9 @@ fun MainBottomChrome(
   state: MainBottomChromeState,
   callback: MainBottomChromeCallback,
   megaphoneActionController: MegaphoneActionController,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
+  showFloatingButtons: Boolean = true,
+  showMegaphones: Boolean = true
 ) {
   val isSplitPane = LocalResources.current.rememberIsSplitPane()
   val navigationType = NavigationType.rememberNavigationType()
@@ -74,7 +76,7 @@ fun MainBottomChrome(
       .animateContentSize()
       .then(if (navigationType == NavigationType.RAIL) Modifier.windowInsetsPadding(WindowInsets.navigationBarsCompat) else Modifier)
   ) {
-    if (state.mainToolbarMode == MainToolbarMode.FULL && navigationType != NavigationType.RAIL) {
+    if (showFloatingButtons && state.mainToolbarMode == MainToolbarMode.FULL && navigationType != NavigationType.RAIL) {
       Box(
         contentAlignment = Alignment.CenterEnd,
         modifier = Modifier.fillMaxWidth()
@@ -86,7 +88,7 @@ fun MainBottomChrome(
       }
     }
 
-    if (state.mainToolbarMode == MainToolbarMode.FULL) {
+    if (showMegaphones && state.mainToolbarMode == MainToolbarMode.FULL) {
       MainMegaphoneContainer(
         state = state.megaphoneState,
         controller = megaphoneActionController,
