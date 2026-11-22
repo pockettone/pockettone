@@ -31,7 +31,7 @@ Other Android keypad phones with similar buttons may work, but they haven't been
 - **Call key sends** the message.
 - **Clear key** deletes one character. When the text box is empty, it goes back a screen. Holding it keeps deleting, but it never leaves the screen on its own.
 - **D-pad.** Scrolls through T9 suggestions while you're picking a word, and moves between items everywhere else.
-- **Installs beside Signal.** It has its own app ID, so you can keep the official app installed too.
+- **Has its own app ID** (`app.pockettone`), so it won't replace any messaging app that's already on the phone.
 
 ### Typing cheat sheet
 
@@ -63,7 +63,9 @@ All of the keypad code is in
 | `t9/T9Engine.kt`, `t9/Tt9WordEngine.kt` | Look up words from key sequences and rank them by how often they're used and which word came before. |
 | `assets/t9/en.txt` | The English dictionary. |
 
-Apart from this folder, the only change to Signal is one line in `ApplicationContext.onCreate()` that switches the keypad layer on. Keeping changes this small makes it easier to bring in new Signal releases.
+Apart from this folder, the only code change is one line in `ApplicationContext.onCreate()` that switches the keypad layer on. Everything else is branding: the app name, the text shown on screen, and the icons. Keeping changes this small makes it easier to bring in new releases from upstream.
+
+Internal Java package names (`org.thoughtcrime.securesms`, `org.signal.*`) and the upstream copyright notices are unchanged. Renaming the packages would touch thousands of files and make upstream updates very hard, and the copyright notices have to stay under the license.
 
 ## Building
 
@@ -74,23 +76,22 @@ Requirements:
 - About 10 GB of free disk space. The first build takes about 20 minutes.
 
 ```sh
-# Signal's repo uses Git LFS for large test files you don't need for building
-GIT_LFS_SKIP_SMUDGE=1 git clone <this repo>
+git clone https://github.com/pockettone/pockettone.git
 cd pockettone
 
 # local.properties — use forward slashes, even on Windows
 echo "sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk" > local.properties
 
-./gradlew :Signal-Android:assemblePlayProdDebug
+./gradlew :PocketTone:assemblePlayProdDebug
 ```
 
-The APKs end up in `app/build/outputs/apk/playProd/debug/`. Install the one that matches the phone's processor (usually `armeabi-v7a` or `arm64-v8a`):
+The APKs end up in `app/build/outputs/apk/playProd/debug/` and are named `PocketTone-…apk`. Install the one that matches the phone's processor (usually `armeabi-v7a` or `arm64-v8a`):
 
 ```sh
 adb install -r app/build/outputs/apk/playProd/debug/<apk-file>.apk
 ```
 
-Release builds need your own signing key. Builds you sign yourself can't install over an official Signal install, and the reverse is also true.
+Release builds need your own signing key.
 
 ## Credits
 
@@ -98,7 +99,6 @@ Release builds need your own signing key. Builds you sign yourself can't install
 - **[TurboText](https://github.com/Ben-Showalter)** by Ben Showalter. PocketTone's T9 typing rules follow TurboText and are used with his permission.
 - **[Traditional T9 (TT9)](https://github.com/sspanak/tt9)**, the source of the English word list (Apache-2.0). See `assets/t9/NOTICE.txt`.
 - **[Flip-DumbPhoneGuide](https://github.com/Ben-Showalter/Flip-DumbPhoneGuide)** (MIT), for its research on these phones.
-- **Dewdrop** by Basic Phones, which showed that a keypad-friendly Signal is possible.
 
 ## License
 
