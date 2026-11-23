@@ -335,6 +335,8 @@ class CallLogAdapter(
       val searchQuery = call.searchQuery
       binding.callRecipientAvatar.setAvatar(Glide.with(binding.callRecipientAvatar), recipient, false)
       binding.callRecipientAvatar.setOnClickListener { onCallClicked(call) }
+      // PocketTone: the D-pad selects the whole row, never just the avatar.
+      binding.callRecipientAvatar.isFocusable = false
       binding.callRecipientBadge.setBadgeFromRecipient(recipient)
       binding.callRecipientName.text = if (!searchQuery.isNullOrEmpty()) {
         SearchUtil.getHighlightedSpan(

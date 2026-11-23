@@ -26,6 +26,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.flip.t9.T9EngineHolder
@@ -43,6 +45,8 @@ import java.util.WeakHashMap
  *    right = the screen's options menu. Call = send. Clear = backspace,
  *    or Back once the field is empty.
  *  - [FocusHighlight] boxes whatever has D-pad focus.
+ *  - [DpadListScroller] makes Up / Down step through lists row by row.
+ *  - [SystemBars] hides the phone's white navigation bar.
  */
 object FlipKeypad {
 
@@ -73,7 +77,9 @@ object FlipKeypad {
         activity.window?.let { runCatching { FocusHighlight.attach(it) } }
         controllers[activity]?.let { runCatching { it.showSoftKeys() } }
       }
-      override fun onActivityResumed(activity: Activity) = Unit
+      override fun onActivityResumed(activity: Activity) {
+        activity.window?.let { runCatching { SystemBars.hideNavigation(it) } }
+      }
       override fun onActivityPaused(activity: Activity) {
         controllers[activity]?.endSession()
       }
@@ -181,7 +187,7 @@ object FlipKeypad {
         }
       }
 
-      if (s == null) return false
+      if (s == null) return DpadListScroller.onKeyDown(activity.currentFocus, code)
       if (s.onKeyDown(code, event)) return true
 
       // Anything the session didn't use (arrows, OK) goes to the app — but
@@ -329,6 +335,12 @@ object FlipKeypad {
       bar.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
         val h = bottom - top
         if (content.paddingBottom != h) content.setPadding(content.paddingLeft, content.paddingTop, content.paddingRight, h)
+      }
+      // Signal draws edge to edge, so if the phone's own navigation bar is
+      // showing (SystemBars normally hides it) sit above it, not behind it.
+      decor.viewTreeObserver.addOnGlobalLayoutListener {
+        val nav = ViewCompat.getRootWindowInsets(decor)?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+        if (bar.translationY != -nav.toFloat()) bar.translationY = -nav.toFloat()
       }
       softBar = bar
       softLeft = left

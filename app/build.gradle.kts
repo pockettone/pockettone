@@ -33,7 +33,7 @@ staticIps.stringPropertyNames().forEach { rootProject.extra[it] = staticIps.getP
 
 val canonicalVersionCode = 1785
 val canonicalVersionName = "8.37.2"
-val currentHotfixVersion = 1
+val currentHotfixVersion = 2
 val maxHotfixVersions = 100
 
 // We don't want versions to ever end in 0 so that they don't conflict with nightly versions
@@ -464,7 +464,8 @@ android {
     create("website") {
       dimension = "distribution"
       buildConfigField("boolean", "MANAGES_APP_UPDATES", "true")
-      buildConfigField("String", "APK_UPDATE_MANIFEST_URL", "\"https://updates.signal.org/android/latest.json\"")
+      // PocketTone: %s is the phone's CPU type (arm64-v8a, armeabi-v7a or universal), filled in by ApkUpdateJob.
+      buildConfigField("String", "APK_UPDATE_MANIFEST_URL", "\"https://raw.githubusercontent.com/pockettone/pockettone/main/update/latest-%s.json\"")
       buildConfigField("String", "BUILD_DISTRIBUTION_TYPE", "\"website\"")
     }
 

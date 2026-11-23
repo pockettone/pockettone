@@ -16,7 +16,8 @@ object PocketToneUi {
 
   private val TAG = Log.tag(PocketToneUi::class.java)
 
-  private const val SHOW_TABS = "show_tabs"
+  private const val SHOW_TAB_BAR = "show_tab_bar"
+  private const val SHOW_ROUND_BUTTONS = "show_tabs"
   private const val SHOW_CHAT_EXTRAS = "show_chat_extras"
   private const val SHOW_TIPS = "show_tips"
   private const val SHOW_CALL_BUTTONS = "show_call_buttons"
@@ -25,12 +26,20 @@ object PocketToneUi {
   private val prefs: SharedPreferences
     get() = AppDependencies.application.getSharedPreferences("pockettone_ui", Context.MODE_PRIVATE)
 
-  /** Chats / Calls / Stories tabs and the round new-chat and camera
-   *  buttons on the chat list. */
+  /** The Chats / Calls tab bar at the bottom of the chat list. Stories
+   *  only gets a tab while Stories is turned on. */
   @JvmStatic
-  var showTabs: Boolean
-    get() = prefs.getBoolean(SHOW_TABS, false)
-    set(value) = prefs.edit().putBoolean(SHOW_TABS, value).apply()
+  var showTabBar: Boolean
+    get() = prefs.getBoolean(SHOW_TAB_BAR, true)
+    set(value) = prefs.edit().putBoolean(SHOW_TAB_BAR, value).apply()
+
+  /** The round new-chat and camera buttons floating over the chat list.
+   *  Off by default: the left soft key ("New") does the same job without
+   *  covering the list. */
+  @JvmStatic
+  var showRoundButtons: Boolean
+    get() = prefs.getBoolean(SHOW_ROUND_BUTTONS, false)
+    set(value) = prefs.edit().putBoolean(SHOW_ROUND_BUTTONS, value).apply()
 
   /** Emoji/sticker, quick-camera and voice-note buttons beside the
    *  message field. */

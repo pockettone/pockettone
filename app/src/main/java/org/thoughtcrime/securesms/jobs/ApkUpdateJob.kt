@@ -61,10 +61,13 @@ class ApkUpdateJob private constructor(parameters: Parameters) : BaseJob(paramet
       return
     }
 
-    Log.d(TAG, "Checking for APK update at ${BuildConfig.APK_UPDATE_MANIFEST_URL}")
+    // PocketTone: one manifest per CPU type, so each phone downloads the smallest APK that runs on it.
+    val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull { it == "arm64-v8a" || it == "armeabi-v7a" } ?: "universal"
+    val manifestUrl = BuildConfig.APK_UPDATE_MANIFEST_URL.replace("%s", abi)
+    Log.d(TAG, "Checking for APK update at $manifestUrl")
 
     val client = AppDependencies.okHttpClient
-    val request = Request.Builder().url(BuildConfig.APK_UPDATE_MANIFEST_URL).build()
+    val request = Request.Builder().url(manifestUrl).build()
 
     val rawUpdateDescriptor: String = client.newCall(request).execute().use { response ->
       if (!response.isSuccessful || response.body == null) {

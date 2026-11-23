@@ -165,6 +165,8 @@ public final class ConversationListItem extends ConstraintLayout implements Bind
     this.deliveryStatusIndicator = findViewById(R.id.conversation_list_item_status);
     this.alertView               = findViewById(R.id.conversation_list_item_alert);
     this.contactPhotoImage       = findViewById(R.id.conversation_list_item_avatar);
+    // PocketTone: the D-pad selects the whole row, never just the avatar.
+    this.contactPhotoImage.setFocusable(false);
     this.archivedView            = findViewById(R.id.conversation_list_item_archived);
     this.unreadIndicator         = findViewById(R.id.conversation_list_item_unread_indicator);
     this.badge                   = findViewById(R.id.conversation_list_item_badge);

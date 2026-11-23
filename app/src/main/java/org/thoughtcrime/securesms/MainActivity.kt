@@ -265,7 +265,8 @@ class MainActivity :
   private val toolbarCallback = ToolbarCallback()
 
   // PocketTone: which optional parts of the chat list are shown.
-  private val showTabs = mutableStateOf(PocketToneUi.showTabs)
+  private val showTabBar = mutableStateOf(PocketToneUi.showTabBar)
+  private val showRoundButtons = mutableStateOf(PocketToneUi.showRoundButtons)
   private val showTips = mutableStateOf(PocketToneUi.showTips)
 
   private val motionEventRelay: MotionEventRelay by viewModels()
@@ -641,12 +642,12 @@ class MainActivity :
             callback = mainBottomChromeCallback,
             megaphoneActionController = megaphoneActionController,
             modifier = Modifier.align(Alignment.BottomCenter),
-            showFloatingButtons = showTabs.value,
+            showFloatingButtons = showRoundButtons.value,
             showMegaphones = showTips.value
           )
         }
 
-        if (navigationType == NavigationType.BAR && mainToolbarState.mode == MainToolbarMode.FULL && showTabs.value) {
+        if (navigationType == NavigationType.BAR && mainToolbarState.mode == MainToolbarMode.FULL && showTabBar.value) {
           Column(
             modifier = Modifier
               .clip(contentLayoutData.navigationBarShape)
@@ -755,17 +756,48 @@ class MainActivity :
       "Mark all read" to { toolbarCallback.onMarkReadClick() },
       "Archived chats" to { toolbarCallback.onOpenArchiveClick() }
     )
-    if (!showTabs.value) {
+    if (!showTabBar.value) {
       items += "Calls" to { mainNavigationViewModel.onEvent(MainNavigationEvents.GoToTab(MainListRoute.Calls)) }
     }
     items += "Settings" to { toolbarCallback.onSettingsClick() }
     items += "PocketTone settings" to { startActivity(PocketToneSettingsActivity.createIntent(this)) }
+    if (BuildConfig.MANAGES_APP_UPDATES) {
+      items += "Check for updates" to {
+        org.thoughtcrime.securesms.dependencies.AppDependencies.jobManager.add(org.thoughtcrime.securesms.jobs.ApkUpdateJob())
+        android.widget.Toast.makeText(this, "Checking for updates. You'll get a notification if there is one.", android.widget.Toast.LENGTH_LONG).show()
+      }
+    }
     AlertDialog.Builder(this)
       .setItems(items.map { it.first }.toTypedArray()) { dialog, which ->
         dialog.dismiss()
         items[which].second()
       }
       .show()
+    return true
+  }
+
+  /** Left / right on a list row switch between the Chats and Calls tabs
+   *  (and Stories, when it's on), so the tab bar never has to be reached. */
+  override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+    if ((keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT || keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) && switchTab(keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT)) {
+      return true
+    }
+    return super.onKeyDown(keyCode, event)
+  }
+
+  private fun switchTab(forward: Boolean): Boolean {
+    if (!showTabBar.value) return false
+    val state = toolbarViewModel.state.value
+    if (state.mode != MainToolbarMode.FULL) return false
+    // Only from a list row, so arrows still move around text fields and the toolbar.
+    var v: View? = currentFocus ?: return false
+    while (v != null && v !is RecyclerView) v = v.parent as? View
+    if (v == null) return false
+    val tabs = listOfNotNull(MainListRoute.Chats, MainListRoute.Calls, MainListRoute.Stories.takeIf { Stories.isFeatureEnabled() })
+    val index = tabs.indexOf(state.destination)
+    if (index < 0) return false
+    val next = tabs.getOrNull(if (forward) index + 1 else index - 1) ?: return false
+    mainNavigationViewModel.onEvent(MainNavigationEvents.GoToTab(next))
     return true
   }
 
@@ -782,9 +814,10 @@ class MainActivity :
     hasBeenOffScreen = false
     dynamicTheme.onResume(this)
 
-    showTabs.value = PocketToneUi.showTabs
+    showTabBar.value = PocketToneUi.showTabBar
+    showRoundButtons.value = PocketToneUi.showRoundButtons
     showTips.value = PocketToneUi.showTips
-    if (!showTabs.value) {
+    if (!showTabBar.value) {
       val tab = toolbarViewModel.state.value.destination
       if (tab == MainListRoute.Calls || tab == MainListRoute.Stories) {
         mainNavigationViewModel.onEvent(MainNavigationEvents.GoToTab(MainListRoute.Chats))

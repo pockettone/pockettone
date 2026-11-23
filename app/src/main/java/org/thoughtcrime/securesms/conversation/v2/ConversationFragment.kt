@@ -241,6 +241,8 @@ import org.thoughtcrime.securesms.conversation.MessageSendType
 import org.thoughtcrime.securesms.conversation.MessageStyler.getStyling
 import org.thoughtcrime.securesms.conversation.PinnedMessagesBottomSheet
 import org.thoughtcrime.securesms.conversation.ReactionAction
+import org.thoughtcrime.securesms.conversation.ReactionMenu
+import org.thoughtcrime.securesms.flip.KeypadMessageMenu
 import org.thoughtcrime.securesms.conversation.ReenableScheduledMessagesDialogFragment
 import org.thoughtcrime.securesms.conversation.ScheduleMessageContextMenu
 import org.thoughtcrime.securesms.conversation.ScheduleMessageDialogCallback
@@ -4627,6 +4629,14 @@ class ConversationFragment :
     }
 
     override fun onItemClick(item: MultiselectPart) {
+      if (!isActionModeStarted()) {
+        // PocketTone: OK on a message opens its options list.
+        val record = item.getMessageRecord()
+        if (!record.isInMemoryMessageRecord && !record.isUpdate && !item.conversationMessage.isActiveCollapsedHead) {
+          showKeypadMessageMenu(item)
+        }
+        return
+      }
       if (isActionModeStarted()) {
         if (item.conversationMessage.isActiveCollapsedHead) {
           viewModel.onExpandEvents(item.conversationMessage.messageRecord.id)
@@ -4661,6 +4671,12 @@ class ConversationFragment :
         return
       }
 
+      // PocketTone: holding OK opens the same plain options list as a press.
+      if (!messageRecord.isUpdate && !item.conversationMessage.isActiveCollapsedHead && adapter.selectedItems.isEmpty()) {
+        showKeypadMessageMenu(item)
+        return
+      }
+
       if (messageRecord.isValidReactionTarget() &&
         !recipient.isBlocked &&
         !viewModel.hasMessageRequestState &&
@@ -4692,6 +4708,38 @@ class ConversationFragment :
         adapter.toggleSelection(item)
         startActionMode()
       }
+    }
+
+    /** PocketTone: the message's options as a plain D-pad list, React first. */
+    private fun showKeypadMessageMenu(item: MultiselectPart) {
+      val conversationMessage = item.conversationMessage
+      val messageRecord = conversationMessage.messageRecord
+      val recipient = viewModel.recipientSnapshot ?: return
+      val listener = ReactionsToolbarListener(conversationMessage)
+      val menu = ReactionMenu.of(
+        context = requireContext(),
+        conversationRecipient = recipient,
+        conversationMessage = conversationMessage,
+        isNonAdminInAnnouncementGroup = conversationGroupViewModel.isNonAdminInAnnouncementGroup(),
+        canEditGroupInfo = conversationGroupViewModel.canEditGroupInfo(),
+        onAction = { listener.onActionSelected(it) }
+      )
+      val canReact = menu.canReact &&
+        messageRecord.isValidReactionTarget() &&
+        !recipient.isBlocked &&
+        !viewModel.hasMessageRequestState &&
+        (!recipient.isGroup || recipient.isActiveGroup)
+
+      val rows = mutableListOf<Pair<CharSequence, () -> Unit>>()
+      if (canReact) {
+        rows += "React" to {
+          KeypadMessageMenu.showReactions(requireContext(), ReactionMenu.appliedEmoji(messageRecord)) { emoji ->
+            disposables += viewModel.updateReaction(messageRecord, emoji).subscribe()
+          }
+        }
+      }
+      menu.items.forEach { action -> rows += action.title to { action.action.run() } }
+      KeypadMessageMenu.show(requireContext(), rows)
     }
 
     /** Snapshots [target] and hands it to the reaction overlay. */
