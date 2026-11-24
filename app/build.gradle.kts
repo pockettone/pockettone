@@ -33,7 +33,7 @@ staticIps.stringPropertyNames().forEach { rootProject.extra[it] = staticIps.getP
 
 val canonicalVersionCode = 1785
 val canonicalVersionName = "8.37.2"
-val currentHotfixVersion = 2
+val currentHotfixVersion = 3
 val maxHotfixVersions = 100
 
 // We don't want versions to ever end in 0 so that they don't conflict with nightly versions
