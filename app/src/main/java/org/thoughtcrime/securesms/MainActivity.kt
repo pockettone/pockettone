@@ -87,6 +87,7 @@ import org.signal.core.ui.BottomSheetUtil
 import org.signal.core.ui.NavigationType
 import org.signal.core.ui.compose.Snackbars
 import org.signal.core.ui.compose.navigationBarsCompat
+import org.signal.core.ui.compose.statusBarsCompat
 import org.signal.core.ui.compose.split.ListDetailEvents
 import org.signal.core.ui.compose.split.ListDetailNavDisplay
 import org.signal.core.ui.compose.split.ListDetailPaneLayout
@@ -107,6 +108,7 @@ import org.signal.core.util.getSerializableCompat
 import org.signal.core.util.logging.Log
 import org.signal.donations.StripeApi
 import org.thoughtcrime.securesms.flip.FlipKeypad
+import org.thoughtcrime.securesms.flip.FloatingTopActions
 import org.thoughtcrime.securesms.flip.PocketToneSettingsActivity
 import org.thoughtcrime.securesms.flip.PocketToneUi
 import org.thoughtcrime.securesms.backup.v2.ArchiveRestoreProgress
@@ -268,6 +270,7 @@ class MainActivity :
   private val showTabBar = mutableStateOf(PocketToneUi.showTabBar)
   private val showRoundButtons = mutableStateOf(PocketToneUi.showRoundButtons)
   private val showTips = mutableStateOf(PocketToneUi.showTips)
+  private val showFullTopBar = mutableStateOf(PocketToneUi.showFullTopBar)
 
   private val motionEventRelay: MotionEventRelay by viewModels()
 
@@ -629,12 +632,22 @@ class MainActivity :
           .background(listContainerColor, contentLayoutData.shape)
           .clip(contentLayoutData.shape)
       ) {
-        MainToolbar(
-          state = mainToolbarState,
-          callback = toolbarCallback
-        )
+        // PocketTone: on the plain chat / call list, floating "+ New" and
+        // "⋮" buttons replace Signal's full top bar. Search, archive and
+        // selection still get their normal bars.
+        val compactTop = !showFullTopBar.value && mainToolbarState.mode == MainToolbarMode.FULL
+        if (!compactTop) {
+          MainToolbar(
+            state = mainToolbarState,
+            callback = toolbarCallback
+          )
+        }
 
-        Box(modifier = Modifier.weight(1f)) {
+        Box(
+          modifier = Modifier
+            .weight(1f)
+            .then(if (compactTop) Modifier.windowInsetsPadding(WindowInsets.statusBarsCompat) else Modifier)
+        ) {
           content()
 
           MainBottomChrome(
@@ -645,6 +658,14 @@ class MainActivity :
             showFloatingButtons = showRoundButtons.value,
             showMegaphones = showTips.value
           )
+
+          if (compactTop) {
+            FloatingTopActions(
+              onNewChat = { mainBottomChromeCallback.onNewChatClick() },
+              onMenu = { onRightSoftKey() },
+              modifier = Modifier.align(Alignment.TopEnd)
+            )
+          }
         }
 
         if (navigationType == NavigationType.BAR && mainToolbarState.mode == MainToolbarMode.FULL && showTabBar.value) {
@@ -751,11 +772,20 @@ class MainActivity :
     if (toolbarViewModel.state.value.mode == MainToolbarMode.ACTION_MODE) return false
     val items = mutableListOf<Pair<String, () -> Unit>>(
       "New chat" to { mainBottomChromeCallback.onNewChatClick() },
-      "New group" to { toolbarCallback.onNewGroupClick() },
       "Search" to { toolbarCallback.onSearchClick() },
+      "New group" to { toolbarCallback.onNewGroupClick() },
       "Mark all read" to { toolbarCallback.onMarkReadClick() },
       "Archived chats" to { toolbarCallback.onOpenArchiveClick() }
     )
+    // The floating "⋮" replaces Signal's top-bar menu, so keep its Calls items.
+    if (toolbarViewModel.state.value.destination == MainListRoute.Calls) {
+      items += if (toolbarViewModel.state.value.callFilter == CallLogFilter.MISSED) {
+        "Show all calls" to { toolbarCallback.onClearCallFilterClick() }
+      } else {
+        "Missed calls only" to { toolbarCallback.onFilterMissedCallsClick() }
+      }
+      items += "Clear call history" to { toolbarCallback.onClearCallHistoryClick() }
+    }
     if (!showTabBar.value) {
       items += "Calls" to { mainNavigationViewModel.onEvent(MainNavigationEvents.GoToTab(MainListRoute.Calls)) }
     }
@@ -817,6 +847,7 @@ class MainActivity :
     showTabBar.value = PocketToneUi.showTabBar
     showRoundButtons.value = PocketToneUi.showRoundButtons
     showTips.value = PocketToneUi.showTips
+    showFullTopBar.value = PocketToneUi.showFullTopBar
     if (!showTabBar.value) {
       val tab = toolbarViewModel.state.value.destination
       if (tab == MainListRoute.Calls || tab == MainListRoute.Stories) {

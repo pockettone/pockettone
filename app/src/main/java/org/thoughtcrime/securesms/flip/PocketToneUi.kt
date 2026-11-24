@@ -21,6 +21,7 @@ object PocketToneUi {
   private const val SHOW_CHAT_EXTRAS = "show_chat_extras"
   private const val SHOW_TIPS = "show_tips"
   private const val SHOW_CALL_BUTTONS = "show_call_buttons"
+  private const val FULL_TOP_BAR = "full_top_bar"
   private const val STORIES_DEFAULTED = "stories_defaulted"
 
   private val prefs: SharedPreferences
@@ -60,6 +61,14 @@ object PocketToneUi {
   var showCallButtons: Boolean
     get() = prefs.getBoolean(SHOW_CALL_BUTTONS, false)
     set(value) = prefs.edit().putBoolean(SHOW_CALL_BUTTONS, value).apply()
+
+  /** Signal's full top bar on the chat list (your avatar, app name,
+   *  search and three dots). Off by default: two small floating buttons
+   *  ("+ New" and "⋮") take its place and search lives in Options. */
+  @JvmStatic
+  var showFullTopBar: Boolean
+    get() = prefs.getBoolean(FULL_TOP_BAR, false)
+    set(value) = prefs.edit().putBoolean(FULL_TOP_BAR, value).apply()
 
   @JvmStatic
   val storiesEnabled: Boolean

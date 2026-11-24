@@ -4731,15 +4731,16 @@ class ConversationFragment :
         (!recipient.isGroup || recipient.isActiveGroup)
 
       val rows = mutableListOf<Pair<CharSequence, () -> Unit>>()
-      if (canReact) {
-        rows += "React" to {
-          KeypadMessageMenu.showReactions(requireContext(), ReactionMenu.appliedEmoji(messageRecord)) { emoji ->
-            disposables += viewModel.updateReaction(messageRecord, emoji).subscribe()
-          }
-        }
-      }
       menu.items.forEach { action -> rows += action.title to { action.action.run() } }
-      KeypadMessageMenu.show(requireContext(), rows)
+      // Reactions sit in a row at the top of the list: OK, OK sends 👍 and 1-9 pick directly.
+      val reactions = if (canReact) {
+        KeypadMessageMenu.Reactions(ReactionMenu.appliedEmoji(messageRecord)) { emoji ->
+          disposables += viewModel.updateReaction(messageRecord, emoji).subscribe()
+        }
+      } else {
+        null
+      }
+      KeypadMessageMenu.show(requireContext(), rows, reactions)
     }
 
     /** Snapshots [target] and hands it to the reaction overlay. */

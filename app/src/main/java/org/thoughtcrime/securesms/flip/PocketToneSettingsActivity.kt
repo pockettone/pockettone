@@ -32,6 +32,7 @@ class PocketToneSettingsActivity : AppCompatActivity() {
 
   private val options = listOf(
     Option("Stories", "Share and view 24-hour stories", { PocketToneUi.storiesEnabled }, { PocketToneUi.setStoriesEnabled(it) }),
+    Option("Full top bar", "Signal's top bar with your photo, search and the three dots. When off, small floating New and ⋮ buttons are used", { PocketToneUi.showFullTopBar }, { PocketToneUi.showFullTopBar = it }),
     Option("Chats and Calls tabs", "Tab bar at the bottom of the chat list (Stories gets a tab only while Stories is on)", { PocketToneUi.showTabBar }, { PocketToneUi.showTabBar = it }),
     Option("Round buttons", "New-chat and camera buttons floating over the chat list", { PocketToneUi.showRoundButtons }, { PocketToneUi.showRoundButtons = it }),
     Option("Call buttons in chats", "Voice and video call buttons at the top of a chat. When off, calls are under Options", { PocketToneUi.showCallButtons }, { PocketToneUi.showCallButtons = it }),
